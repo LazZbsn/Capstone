@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  edge-1:
+    build: .
+    command: python src/edge/edge_node.py config/edge_config.json
+    ports:
+      - "5001:5001"
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+
+  edge-2:
+    build: .
+    command: python src/edge/edge_node.py config/edge_config_2.json
+    ports:
+      - "5002:5002"
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+
+  edge-3:
+    build: .
+    command: python src/edge/edge_node.py config/edge_config_3.json
+    ports:
+      - "5003:5003"
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+
+  core-1:
+    build: .
+    command: python src/core/core_node.py config/core_config.json
+    ports:
+      - "6001:6001"
+    depends_on:
+      - edge-1
+      - edge-2
+      - edge-3
+
+  core-2:
+    build: .
+    command: python src/core/core_node.py config/core_config_2.json
+    ports:
+      - "6002:6002"
+    depends_on:
+      - core-1
+
+  cloud-1:
+    build: .
+    command: python src/cloud/cloud_node.py config/cloud_config.json
+    ports:
+      - "7001:7001"
+    depends_on:
+      - core-1
+      - core-2
+
+  cloud-2:
+    build: .
+    command: python src/cloud/cloud_node.py config/cloud_config_2.json
+    ports:
+      - "7002:7002"
+    depends_on:
+      - cloud-1
+
+  gui:
+    build: .
+    command: python src/gui/gui_server.py
+    ports:
+      - "8080:8080"
+    depends_on:
+      - edge-1
+      - core-1
+      - cloud-1
+
+volumes:
+  redis-data:

@@ -1,0 +1,21 @@
+{
+  "node_id": "edge-1",
+  "host": "localhost",
+  "port": 5001,
+  "cache_port": 6379,
+  "core_nodes": [
+    {"host": "localhost", "port": 6001},
+    {"host": "localhost", "port": 6002}
+  ],
+  "load_balancer": {
+    "algorithm": "round_robin",
+    "health_check_interval": 5
+  },
+  "metrics": {
+    "port": 9091
+  },
+  "replication": {
+    "enabled": true,
+    "replicas": 2
+  }
+}

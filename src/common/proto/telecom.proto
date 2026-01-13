@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package telecom;
+
+// Request message for edge node
+message EdgeRequest {
+    string request_id = 1;
+    string operation = 2;
+    map<string, string> data = 3;
+    string client_id = 4;
+    int64 timestamp = 5;
+}
+
+// Response message from edge node
+message EdgeResponse {
+    string request_id = 1;
+    bool success = 2;
+    string message = 3;
+    map<string, string> data = 4;
+    int64 latency_ms = 5;
+}
+
+// Transaction request
+message TransactionRequest {
+    string transaction_id = 1;
+    repeated Operation operations = 2;
+    int32 timeout_seconds = 3;
+}
+
+message Operation {
+    string operation_id = 1;
+    string node_id = 2;
+    string operation_type = 3;
+    map<string, string> parameters = 4;
+}
+
+// Transaction response
+message TransactionResponse {
+    string transaction_id = 1;
+    TransactionStatus status = 2;
+    string message = 3;
+    int64 latency_ms = 4;
+}
+
+enum TransactionStatus {
+    PREPARING = 0;
+    PREPARED = 1;
+    COMMITTED = 2;
+    ABORTED = 3;
+    TIMEOUT = 4;
+}
+
+// Prepare message for 2PC
+message PrepareMessage {
+    string transaction_id = 1;
+    repeated Operation operations = 2;
+}
+
+// Vote message for 2PC
+message VoteMessage {
+    string transaction_id = 1;
+    bool can_commit = 2;
+    string node_id = 3;
+}
+
+// Commit/Abort message
+message CommitMessage {
+    string transaction_id = 1;
+    bool commit = 2;  // true for commit, false for abort
+}
+
+// Heartbeat message
+message Heartbeat {
+    string node_id = 1;
+    int64 timestamp = 2;
+    SystemMetrics metrics = 3;
+}
+
+message SystemMetrics {
+    float cpu_percent = 1;
+    float memory_percent = 2;
+    int32 active_connections = 3;
+    int64 requests_per_second = 4;
+}
+
+// Load balance request
+message LoadBalanceRequest {
+    string request_type = 1;
+    map<string, string> metadata = 2;
+}
+
+// Node information
+message NodeInfo {
+    string node_id = 1;
+    string node_type = 2;
+    string host = 3;
+    int32 port = 4;
+    SystemMetrics metrics = 5;
+    bool healthy = 6;
+}
+
+// Service definitions
+service EdgeService {
+    rpc ProcessRequest(EdgeRequest) returns (EdgeResponse);
+    rpc HealthCheck(Heartbeat) returns (Heartbeat);
+}
+
+service CoreService {
+    rpc CoordinateTransaction(TransactionRequest) returns (TransactionResponse);
+    rpc PrepareTransaction(PrepareMessage) returns (VoteMessage);
+    rpc CommitTransaction(CommitMessage) returns (TransactionResponse);
+    rpc GetLoadBalanceTarget(LoadBalanceRequest) returns (NodeInfo);
+    rpc HealthCheck(Heartbeat) returns (Heartbeat);
+}
+
+service CloudService {
+    rpc ExecuteOperation(Operation) returns (TransactionResponse);
+    rpc PrepareOperation(PrepareMessage) returns (VoteMessage);
+    rpc CommitOperation(CommitMessage) returns (TransactionResponse);
+    rpc HealthCheck(Heartbeat) returns (Heartbeat);
+}

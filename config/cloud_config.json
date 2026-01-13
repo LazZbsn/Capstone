@@ -1,0 +1,30 @@
+{
+  "node_id": "cloud-1",
+  "host": "localhost",
+  "port": 7001,
+  "database": {
+    "type": "postgresql",
+    "host": "localhost",
+    "port": 5432,
+    "database": "telecom_db",
+    "user": "postgres",
+    "password": "postgres"
+  },
+  "replication": {
+    "role": "primary",
+    "replicas": [
+      {"host": "localhost", "port": 7002}
+    ]
+  },
+  "core_nodes": [
+    {"host": "localhost", "port": 6001},
+    {"host": "localhost", "port": 6002}
+  ],
+  "metrics": {
+    "port": 9093
+  },
+  "storage": {
+    "cache_size_mb": 512,
+    "persistence_path": "./data"
+  }
+}
