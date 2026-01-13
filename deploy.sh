@@ -6,10 +6,19 @@ echo "========================================="
 echo "Deploying Distributed Telecom System"
 echo "========================================="
 
-# Activate virtual environment if exists
+# Determine Python interpreter
 if [ -d "venv" ]; then
-    echo "Activating virtual environment..."
-    source venv/bin/activate || venv\Scripts\activate
+    PYTHON_CMD="venv/bin/python"
+    echo "Using virtual environment Python: $PYTHON_CMD"
+    # Verify venv has dependencies
+    if ! $PYTHON_CMD -c "import flask" 2>/dev/null; then
+        echo "⚠️  Warning: Flask not found in virtual environment"
+        echo "   Installing dependencies..."
+        $PYTHON_CMD -m pip install -r requirements.txt
+    fi
+else
+    PYTHON_CMD="python3"
+    echo "Using system Python: $PYTHON_CMD"
 fi
 
 # Create logs directory
@@ -23,7 +32,11 @@ start_node() {
     local port=$4
     
     echo "Starting $name..."
-    python "$script" "$config" > "logs/${name}.log" 2>&1 &
+    if [ -n "$config" ]; then
+        $PYTHON_CMD "$script" "$config" > "logs/${name}.log" 2>&1 &
+    else
+        $PYTHON_CMD "$script" > "logs/${name}.log" 2>&1 &
+    fi
     echo $! > "logs/${name}.pid"
     sleep 1
     echo "$name started (PID: $(cat logs/${name}.pid))"
