@@ -40,6 +40,10 @@ fi
 echo "Creating directories..."
 mkdir -p data logs
 
+# Make scripts executable
+echo "Making scripts executable..."
+chmod +x deploy.sh stop.sh check_status.sh 2>/dev/null || true
+
 # Check for Redis (optional but recommended)
 echo "Checking for Redis..."
 if command -v redis-server &> /dev/null; then
