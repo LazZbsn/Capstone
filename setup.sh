@@ -1,76 +1,37 @@
 #!/bin/bash
-
-# Setup script for Distributed Telecom System
+# Refined Setup Script for Distributed Telecom System 
 
 echo "========================================="
 echo "Setting up Distributed Telecom System"
 echo "========================================="
 
-# Check Python version
-echo "Checking Python version..."
-python3 --version || python --version
+# 1. Install System Dependencies
+echo "Installing system-level dependencies..."
+sudo apt-get update && sudo apt-get install -y \
+    build-essential python3-dev libpq-dev \
+    redis-server protobuf-compiler
 
-# Create virtual environment
+# 2. Setup Python Environment
 echo "Creating virtual environment..."
-python3 -m venv venv || python -m venv venv
+python3 -m venv venv
+source venv/bin/activate 
 
-# Activate virtual environment
-echo "Activating virtual environment..."
-source venv/bin/activate || venv\Scripts\activate
+echo "Upgrading pip tools..."
+pip install --upgrade pip setuptools wheel
 
-# Upgrade pip
-echo "Upgrading pip..."
-pip install --upgrade pip
+# 3. Install Dependencies
+echo "Installing Python packages..."
+pip install -r requirements.txt [cite: 84, 121]
 
-# Install dependencies
-echo "Installing dependencies..."
-pip install -r requirements.txt
+# 4. gRPC Code Generation
+echo "Generating gRPC code from proto files..."
+python -m grpc_tools.protoc -I src/common/proto \
+    --python_out=src/common/proto \
+    --grpc_python_out=src/common/proto \
+    src/common/proto/telecom.proto
 
-# Generate gRPC code from proto files
-echo "Generating gRPC code..."
-if command -v protoc &> /dev/null; then
-    python -m grpc_tools.protoc -I src/common/proto --python_out=src/common/proto --grpc_python_out=src/common/proto src/common/proto/telecom.proto
-    echo "gRPC code generated successfully"
-else
-    echo "Warning: protoc not found. gRPC code generation skipped."
-    echo "Install protobuf compiler: https://grpc.io/docs/protoc-installation/"
-fi
+# 5. Initialize Directories
+mkdir -p data logs 
+chmod +x deploy.sh stop.sh check_status.sh
 
-# Create necessary directories
-echo "Creating directories..."
-mkdir -p data logs
-
-# Make scripts executable
-echo "Making scripts executable..."
-chmod +x deploy.sh stop.sh check_status.sh 2>/dev/null || true
-
-# Check for Redis (optional but recommended)
-echo "Checking for Redis..."
-if command -v redis-server &> /dev/null; then
-    echo "Redis found. You can start it with: redis-server"
-else
-    echo "Warning: Redis not found. Install Redis for caching support."
-    echo "On Ubuntu: sudo apt-get install redis-server"
-    echo "On macOS: brew install redis"
-fi
-
-# Check for PostgreSQL (optional)
-echo "Checking for PostgreSQL..."
-if command -v psql &> /dev/null; then
-    echo "PostgreSQL found."
-else
-    echo "Info: PostgreSQL not found. Cloud nodes will use in-memory storage."
-    echo "Install PostgreSQL for persistent storage."
-fi
-
-echo ""
-echo "========================================="
-echo "Setup complete!"
-echo "========================================="
-echo ""
-echo "Next steps:"
-echo "1. Activate virtual environment: source venv/bin/activate (Linux/Mac) or venv\\Scripts\\activate (Windows)"
-echo "2. Start Redis: redis-server"
-echo "3. Run deployment script: ./deploy.sh"
-echo "4. Access GUI at: http://localhost:8080"
-echo ""
+echo "Setup complete! Start Redis with 'sudo service redis-server start'."

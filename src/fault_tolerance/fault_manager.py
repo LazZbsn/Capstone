@@ -114,8 +114,8 @@ class FaultManager:
                     return True
         return False
     
-    def detect_byzantine_failure(self, node_id: str, inconsistent_responses: List[Dict]) -> bool:
-        """Detect Byzantine failure (inconsistent behavior)"""
+    """def detect_byzantine_failure(self, node_id: str, inconsistent_responses: List[Dict]) -> bool:
+        ""Detect Byzantine failure (inconsistent behavior)"""
         if not self.byzantine_detection:
             return False
         
@@ -130,9 +130,23 @@ class FaultManager:
                         status.failure_type = FailureType.BYZANTINE
                         status.failure_count += 1
                     return True
+        return False"""
+    
+    def detect_byzantine_failure(self, node_id: str, responses: List[Dict]) -> bool:
+    """Implement majority voting to detect Byzantine actors """
+    if not self.byzantine_detection or len(responses) < 2:
         return False
     
-    def get_failed_nodes(self) -> List[str]:
+    # Check if any response deviates from the majority
+    fingerprints = [str(sorted(r.items())) for r in responses]
+    most_common = max(set(fingerprints), key=fingerprints.count)
+    
+    if fingerprints.count(most_common) < (len(responses) / 2 + 1):
+        logger.error(f"Byzantine inconsistency detected at node {node_id}") [cite: 137]
+        return True
+    return False
+
+     def get_failed_nodes(self) -> List[str]:
         """Get list of failed nodes"""
         with self.lock:
             return [node_id for node_id, status in self.node_statuses.items() if not status.healthy]

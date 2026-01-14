@@ -1,109 +1,70 @@
 #!/bin/bash
+# Complete Fixed Deployment Script
 
-# Deployment script for Distributed Telecom System
-
-echo "========================================="
-echo "Deploying Distributed Telecom System"
-echo "========================================="
-
-# Determine Python interpreter
-if [ -d "venv" ]; then
-    PYTHON_CMD="venv/bin/python"
-    echo "Using virtual environment Python: $PYTHON_CMD"
-    # Verify venv has dependencies
-    if ! $PYTHON_CMD -c "import flask" 2>/dev/null; then
-        echo "⚠️  Warning: Flask not found in virtual environment"
-        echo "   Installing dependencies..."
-        $PYTHON_CMD -m pip install -r requirements.txt
-    fi
-else
-    PYTHON_CMD="python3"
-    echo "Using system Python: $PYTHON_CMD"
-fi
-
-# Create logs directory
+source venv/bin/activate
+PYTHON_CMD="python3"
 mkdir -p logs
+mkdir -p config
 
-# Function to start a process
+echo "========================================="
+echo "Generating Missing Configurations..."
+echo "========================================="
+
+# Helper to generate configs if they don't exist
+generate_config() {
+    local src=$1
+    local dest=$2
+    local old_id=$3
+    local new_id=$4
+    local old_port=$5
+    local new_port=$6
+
+    if [ -f "$src" ]; then
+        cp "$src" "$dest"
+        sed -i "s/\"node_id\": \"$old_id\"/\"node_id\": \"$new_id\"/" "$dest"
+        sed -i "s/\"port\": $old_port/\"port\": $new_port/" "$dest"
+        echo "✅ Generated $dest"
+    else
+        echo "❌ Error: Template $src not found!"
+    fi
+}
+
+# Generate Cloud, Core, and Edge secondary configs
+generate_config "config/cloud_config.json" "config/cloud_config_2.json" "cloud-1" "cloud-2" "7001" "7002"
+generate_config "config/core_config.json" "config/core_config_2.json" "core-1" "core-2" "6001" "6002"
+generate_config "config/edge_config.json" "config/edge_config_2.json" "edge-1" "edge-2" "5001" "5002"
+generate_config "config/edge_config.json" "config/edge_config_3.json" "edge-1" "edge-3" "5001" "5003"
+
 start_node() {
     local name=$1
     local script=$2
     local config=$3
-    local port=$4
     
-    echo "Starting $name..."
-    if [ -n "$config" ]; then
-        $PYTHON_CMD "$script" "$config" > "logs/${name}.log" 2>&1 &
-    else
-        $PYTHON_CMD "$script" > "logs/${name}.log" 2>&1 &
+    if [ ! -f "$config" ] && [ "$name" != "gui" ]; then
+        echo "⚠️ Skipping $name: $config still missing."
+        return
     fi
+
+    echo "Starting $name..."
+    $PYTHON_CMD "$script" "$config" > "logs/${name}.log" 2>&1 &
     echo $! > "logs/${name}.pid"
-    sleep 1
-    echo "$name started (PID: $(cat logs/${name}.pid))"
+    sleep 2
 }
 
-# Start Edge Nodes
-echo "Starting Edge Nodes..."
-start_node "edge-1" "src/edge/edge_node.py" "config/edge_config.json" "5001"
+echo -e "\nStep 1: Deploying Cloud Layer..."
+start_node "cloud-1" "src/cloud/cloud_node.py" "config/cloud_config.json"
+start_node "cloud-2" "src/cloud/cloud_node.py" "config/cloud_config_2.json"
 
-# Update config for edge-2 and edge-3
-sed 's/"node_id": "edge-1"/"node_id": "edge-2"/' config/edge_config.json > config/edge_config_2.json
-sed 's/"port": 5001/"port": 5002/' config/edge_config_2.json > config/edge_config_2_tmp.json && mv config/edge_config_2_tmp.json config/edge_config_2.json
+echo -e "\nStep 2: Deploying Core Layer..."
+start_node "core-1" "src/core/core_node.py" "config/core_config.json"
+start_node "core-2" "src/core/core_node.py" "config/core_config_2.json"
 
-sed 's/"node_id": "edge-1"/"node_id": "edge-3"/' config/edge_config.json > config/edge_config_3.json
-sed 's/"port": 5001/"port": 5003/' config/edge_config_3.json > config/edge_config_3_tmp.json && mv config/edge_config_3_tmp.json config/edge_config_3.json
+echo -e "\nStep 3: Deploying Edge Layer..."
+start_node "edge-1" "src/edge/edge_node.py" "config/edge_config.json"
+start_node "edge-2" "src/edge/edge_node.py" "config/edge_config_2.json"
+start_node "edge-3" "src/edge/edge_node.py" "config/edge_config_3.json"
 
-start_node "edge-2" "src/edge/edge_node.py" "config/edge_config_2.json" "5002"
-start_node "edge-3" "src/edge/edge_node.py" "config/edge_config_3.json" "5003"
+echo -e "\nStep 4: Deploying GUI..."
+start_node "gui" "src/gui/gui_server.py" ""
 
-# Start Core Nodes
-echo "Starting Core Nodes..."
-start_node "core-1" "src/core/core_node.py" "config/core_config.json" "6001"
-
-sed 's/"node_id": "core-1"/"node_id": "core-2"/' config/core_config.json > config/core_config_2.json
-sed 's/"port": 6001/"port": 6002/' config/core_config_2.json > config/core_config_2_tmp.json && mv config/core_config_2_tmp.json config/core_config_2.json
-sed 's/"coordinator_role": "primary"/"coordinator_role": "secondary"/' config/core_config_2.json > config/core_config_2_tmp.json && mv config/core_config_2_tmp.json config/core_config_2.json
-
-start_node "core-2" "src/core/core_node.py" "config/core_config_2.json" "6002"
-
-# Start Cloud Nodes
-echo "Starting Cloud Nodes..."
-start_node "cloud-1" "src/cloud/cloud_node.py" "config/cloud_config.json" "7001"
-
-sed 's/"node_id": "cloud-1"/"node_id": "cloud-2"/' config/cloud_config.json > config/cloud_config_2.json
-sed 's/"port": 7001/"port": 7002/' config/cloud_config_2.json > config/cloud_config_2_tmp.json && mv config/cloud_config_2_tmp.json config/cloud_config_2.json
-sed 's/"role": "primary"/"role": "replica"/' config/cloud_config_2.json > config/cloud_config_2_tmp.json && mv config/cloud_config_2_tmp.json config/cloud_config_2.json
-
-start_node "cloud-2" "src/cloud/cloud_node.py" "config/cloud_config_2.json" "7002"
-
-# Start GUI
-echo "Starting GUI Dashboard..."
-start_node "gui" "src/gui/gui_server.py" "" "8080"
-
-# Wait a bit for all services to start
-sleep 3
-
-echo ""
-echo "========================================="
-echo "Deployment Complete!"
-echo "========================================="
-echo ""
-echo "All nodes started. Access the GUI at:"
-echo "  http://localhost:8080"
-echo ""
-echo "Edge Nodes:"
-echo "  - Edge-1: http://localhost:5001"
-echo "  - Edge-2: http://localhost:5002"
-echo "  - Edge-3: http://localhost:5003"
-echo ""
-echo "Core Nodes:"
-echo "  - Core-1: http://localhost:6001"
-echo "  - Core-2: http://localhost:6002"
-echo ""
-echo "Cloud Nodes:"
-echo "  - Cloud-1: http://localhost:7001"
-echo "  - Cloud-2: http://localhost:7002"
-echo ""
-echo "To stop all nodes, run: ./stop.sh"
-echo "To view logs, check the logs/ directory"
-echo ""
+echo -e "\nDeployment Complete. Access Dashboard: http://localhost:8080"

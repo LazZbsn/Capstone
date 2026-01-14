@@ -438,12 +438,12 @@ DASHBOARD_HTML = """
 app = Flask(__name__)
 CORS(app)
 
-@app.route('/')
+"""@app.route('/')
 def dashboard():
     """Serve the dashboard HTML"""
     return render_template_string(DASHBOARD_HTML)
-
-@app.route('/api/aggregate-metrics')
+"""
+"""@app.route('/api/aggregate-metrics')
 def aggregate_metrics():
     """Aggregate metrics from all nodes"""
     edge_ports = [5001, 5002, 5003]
@@ -478,7 +478,41 @@ def aggregate_metrics():
             pass
     
     return jsonify(all_metrics)
+"""
+"""Web GUI Dashboard for monitoring and control"""
+from flask import Flask, render_template_string, jsonify, request
+from flask_cors import CORS
+import requests
+import logging
 
+app = Flask(__name__)
+CORS(app) # Enable CORS to prevent browser blocks
+
+@app.route('/api/aggregate-metrics')
+def aggregate_metrics():
+    """Proxy metrics to ensure the Dashboard sees all nodes"""
+    node_map = {
+        'edge_nodes': [5001, 5002, 5003],
+        'core_nodes': [6001, 6002],
+        'cloud_nodes': [7001, 7002]
+    }
+    
+    all_metrics = {k: [] for k in node_map}
+    for category, ports in node_map.items():
+        for port in ports:
+            try:
+                # Use a very short timeout to keep the dashboard responsive
+                resp = requests.get(f'http://127.0.0.1:{port}/api/metrics', timeout=0.8)
+                if resp.status_code == 200:
+                    all_metrics[category].append(resp.json())
+                else:
+                    all_metrics[category].append({"port": port, "status": "unhealthy"})
+            except Exception:
+                all_metrics[category].append({"port": port, "status": "offline"})
+    
+    return jsonify(all_metrics)
+
+# Standard template logic continues below...
 if __name__ == '__main__':
     print("Starting GUI Dashboard on http://localhost:8080")
     app.run(host='0.0.0.0', port=8080, debug=True)
